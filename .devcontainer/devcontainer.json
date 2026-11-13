@@ -1,6 +1,6 @@
 {
   "name": "Financial Portfolio Optimization - Python 3.14",
-  "image": "mcr.microsoft.com/devcontainers/python:3.14-bullseye",
+  "image": "mcr.microsoft.com/devcontainers/python:3.14-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": false,
