@@ -34,6 +34,12 @@ from src.optimization.benchmarks import (
     equal_weights,
     equal_weight_portfolio,
 )
+from src.optimization.optimizer import (
+    minimum_variance_portfolio,
+    maximum_sharpe_portfolio,
+    target_return_portfolio
+)
+from src.optimization.optimization_pipeline import compare_portfolios
 
 __all__ = [
     "portfolio_return",
@@ -46,4 +52,8 @@ __all__ = [
     "target_return_constraint",
     "equal_weights",
     "equal_weight_portfolio",
+    "minimum_variance_portfolio",
+    "maximum_sharpe_portfolio",
+    "target_return_portfolio",
+    "compare_portfolios"
 ]
