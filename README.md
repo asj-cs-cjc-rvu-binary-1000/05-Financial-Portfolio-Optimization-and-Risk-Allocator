@@ -66,7 +66,9 @@ Reference structure from Section 3 of project brief:
 │   └── visualization/
 │       └── charts.py             # Phase 3+: Plotly charts
 ├── app/                          # Streamlit app (Phase 6)
-├── tests/                        # pytest suite (234 tests as of Phase 5)
+│   ├── __init__.py
+│   └── app.py                    # entry point — `streamlit run app/app.py`
+├── tests/                        # pytest suite (254 tests as of Phase 6)
 │   └── __init__.py
 ├── docs/
 │   ├── mathematical_foundations.md   # Phases 3 & 4 LaTeX derivations
@@ -192,12 +194,6 @@ pytest tests/test_returns.py -v   # 10 passed
 | Correlation Heatmap | Eigenvalue Spectrum |
 | :---: | :---: |
 | [Correlation](docs/screenshots/corr_heatmap.png) | [Eigen Spectrum](docs/screenshots/eigen_spectrum.png) |
-
-### Phase 5 visuals
-
-| Efficient Frontier | Drawdown (Max Sharpe) | VaR Histogram (Max Sharpe) |
-| :---: | :---: | :---: |
-| [Efficient Frontier](docs/screenshots/efficient_frontier.png) | [Drawdown](docs/screenshots/drawdown_max_sharpe.png) | [VaR Histogram](docs/screenshots/var_histogram_max_sharpe.png) |
 
 **How to run Phase 3:**
 
@@ -325,11 +321,50 @@ pytest tests/ -v                              # 234 passed (all phases)
 
 Note on kaleido DeprecationWarning: python -m src.visualization.charts prints a DeprecationWarning about kaleido < 1.0.0. This is expected: kaleido==0.2.1 is pinned because kaleido >= 1.0 requires system Chrome, which fails in the Codespace sandbox. The pinned version works headless and renders all five PNGs correctly. Do not upgrade kaleido — see docs/environment_versions.md for the Phase 3 rationale.
 
-### Phase 6+ — Pending
+### Phase 5 visuals
 
-- Phase 6: Interactive Streamlit dashboard (app/)
+| Efficient Frontier | Drawdown (Max Sharpe) | VaR Histogram (Max Sharpe) |
+| :---: | :---: | :---: |
+| [Efficient Frontier](docs/screenshots/efficient_frontier.png) | [Drawdown](docs/screenshots/drawdown_max_sharpe.png) | [VaR Histogram](docs/screenshots/var_histogram_max_sharpe.png) |
 
-- Phase 7: Documentation finalization, screenshots, final testing, presentation
+### Phase 6 dashboard
+
+| Optimization tab | Risk Analysis tab | Frontier tab |
+| :---: | :---: | :---: |
+| [Optimization](docs/screenshots/dashboard_optimization.png) | [Risk Analysis](docs/screenshots/dashboard_risk.png) | [Frontier](docs/screenshots/dashboard_frontier.png) |
+
+### Phase 6 – Interactive Streamlit Dashboard (Complete)
+
+**Why this matters:** Phases 1–5 built a full analytical pipeline. Phase 6 exposes it through a browser UI so a grader or user can change inputs and see the numbers update — without ever touching Python. The dashboard is a **read-only rendering layer** over the Phase 4 and Phase 5 public functions. No mathematical logic is reimplemented inside Streamlit.
+
+**Dashboard structure** (`app/app.py`, single file, ~600 lines):
+- **Sidebar** — ticker multiselect from the CSV, date range, risk-free rate slider, VaR/CVaR confidence, frontier resolution, optional target-return slider (bounds dynamically from selected assets).
+- **Tab 1 — Optimization:** `compare_portfolios` → comparison table + grouped allocation bar chart.
+- **Tab 2 — Risk Analysis:** `compare_risk_metrics` → risk table + portfolio selector + `plot_drawdown` + `plot_var_histogram` + VaR/CVaR/MDD metric cards.
+- **Tab 3 — Frontier:** `analyze_frontier` → six-layer efficient frontier chart (`plot_efficient_frontier`) + anchor cards + metadata table.
+
+**Caching:** four `@st.cache_data` boundaries on `_load_prices`, `_returns_full`, `_filtered_data`, `_analyze_frontier`. The last is the most expensive (~2–4s per call, 100 SLSQP optimizations) and is critical to a smooth UX.
+
+**Error handling:** three-layer model — pre-run validation (sidebar errors + disabled Run), per-tab runtime catch (no `st.stop()`; a failure in one tab does not break the others), post-run success-flag inspection (the optimizer's own `message` field is surfaced to the user).
+
+**How to run:**
+
+```bash
+source .venv/bin/activate
+streamlit run app/app.py
+# Serves on http://localhost:8501 (forwarded by devcontainer from Phase 0)
+```
+
+Open the forwarded URL in the Codespace Ports tab.
+
+**Prerequisites:** data/processed/prices_clean_*.csv must exist. If missing, run python -m src.data.stock_data first. The dashboard does not download data itself.
+
+**Tests:** pytest tests/test_dashboard.py -v → 20 passed (pure helpers + validation + target bounds). The Streamlit widgets themselves are visually verified — no browser automation.
+
+**Screenshots:** docs/screenshots/dashboard_optimization.png, dashboard_risk.png, dashboard_frontier.png — captured from the running app on the real 7-ticker dataset at r_f = 2%.
+
+### Phase 7 — Pending
+Documentation finalization, final screenshots, final testing, presentation
 
 ## Team Members and Course Context
 
@@ -341,7 +376,7 @@ Note on kaleido DeprecationWarning: python -m src.visualization.charts prints a 
   - Phase 3: Linear Algebra (Covariance, Correlation, Eigen) — ✅ Complete
   - Phase 4: Optimization (Mean-Variance, Max-Sharpe, Target-Return) — ✅ Complete
   - Phase 5: Risk Analysis (VaR, CVaR, Drawdown) & Efficient Frontier — ✅ Complete
-  - Phase 6: Interactive Streamlit Dashboard — ⏳ Pending
+  - Phase 6: Interactive Streamlit Dashboard — ✅ Complete
   - Phase 7: Documentation, Testing & Final Polish — ⏳ Pending
 
 ## License
