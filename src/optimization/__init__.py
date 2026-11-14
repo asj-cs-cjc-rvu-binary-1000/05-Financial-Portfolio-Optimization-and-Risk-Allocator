@@ -30,6 +30,10 @@ from src.optimization.constraints import (
     long_only_bounds,
     target_return_constraint,
 )
+from src.optimization.benchmarks import (
+    equal_weights,
+    equal_weight_portfolio,
+)
 
 __all__ = [
     "portfolio_return",
@@ -40,4 +44,6 @@ __all__ = [
     "budget_constraint",
     "long_only_bounds",
     "target_return_constraint",
+    "equal_weights",
+    "equal_weight_portfolio",
 ]
