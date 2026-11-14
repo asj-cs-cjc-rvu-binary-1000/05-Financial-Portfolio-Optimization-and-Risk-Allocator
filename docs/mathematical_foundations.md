@@ -548,3 +548,227 @@ mathematical guarantees of §11.6.
 - Task 4.10: CLI + notebook + docs — `python -m src.optimization.optimization_pipeline` runs end-to-end on 7-ticker real data, writes `docs/optimization_summary.md`
 
 This doc renders with LaTeX on GitHub (MathJax). No code blocks in the math sections — math only. Code blocks appear only in the "Implementation Map" tables where the reference to a function is clearer as inline code.
+
+
+---
+
+## 12. Risk Analytics (Phase 5)
+
+Phase 5 extends the analytical framework with the risk metrics that a
+portfolio manager cares about beyond the mean-variance trade-off: how bad
+can a single day be (VaR), how bad is a bad day on average (CVaR), and how
+deep was the worst peak-to-trough drawdown (MDD).
+
+Let $R = \{r_1, r_2, \ldots, r_T\}$ be a daily return series, indexed by
+$t = 1, \ldots, T$. Throughout this section, $r_f$ denotes the annualized
+risk-free rate (project convention: decimal, $0.02$ = 2%/yr) and $c \in (0,1)$
+denotes the confidence level of VaR / CVaR (project default $c = 0.95$).
+
+### 12.1 Maximum drawdown
+
+Given daily returns $r_1, \ldots, r_T$, define the **cumulative return index**
+
+$$
+C_t = \prod_{s=1}^t (1 + r_s), \quad C_0 = 1.
+$$
+
+This is the value of \$1 invested at $t=0$ and held with daily rebalancing
+through $t$. Define the **running peak**
+
+$$
+P_t = \max_{s \le t} C_s.
+$$
+
+The **drawdown series** is the relative decline from the running peak:
+
+$$
+D_t = \frac{C_t - P_t}{P_t} = \frac{C_t}{P_t} - 1 \le 0.
+$$
+
+The **maximum drawdown** is
+
+$$
+\text{MDD}(R) = \min_{1 \le t \le T} D_t \le 0.
+$$
+
+**Why signed:** MDD is a realized cumulative return, so it is reported with
+the same sign convention as every other return series in this project
+($-0.25$ for a 25% peak-to-trough decline). This makes the identity
+$\text{MDD}(R) = \min_t D_t(R)$ hold exactly — no sign flip between the
+scalar and the series.
+
+**Identity (test invariant):** $\text{MDD}(R) = \min_t D_t(R)$.
+This is enforced by `tests/test_risk_metrics.py::test_maximum_drawdown_equals_series_min`.
+
+### 12.2 Historical VaR
+
+The **historical VaR** at confidence $c$ is the empirical $1-c$ quantile of
+the return distribution, reported as a positive loss magnitude:
+
+$$
+\text{VaR}_c(R) = -Q_{1-c}(R),
+$$
+
+where $Q_p(R)$ denotes the $p$-quantile of $R$ under the chosen interpolation
+method. The project uses `numpy.quantile` with the default **linear
+interpolation** method, which matches `pandas.Series.quantile()` and is the
+standard empirical VaR convention.
+
+**Interpretation:** "$\text{VaR}_{0.95} = 2\%$" means "on 95% of trading days,
+the portfolio's loss does not exceed 2%." VaR is a **threshold** — it says
+nothing about how bad a day can be beyond the threshold.
+
+**Positive-quantile edge case:** if $Q_{1-c}(R) > 0$ (the worst $1-c$ of
+days were still gains — extremely unusual but possible for short histories
+of well-performing assets), then $\text{VaR}_c < 0$, signaling "no loss in
+the tail." This is intentional and mathematically correct. Do not clip the
+result to 0.
+
+### 12.3 Historical CVaR (Expected Shortfall)
+
+The **historical CVaR** at confidence $c$ is the negative mean of the returns
+at or below the VaR threshold:
+
+$$
+\text{CVaR}_c(R) = -\mathbb{E}\!\left[ R \;\middle|\; R \le Q_{1-c}(R) \right]
+= -\frac{1}{|\{t : r_t \le Q_{1-c}(R)\}|} \sum_{t : r_t \le Q_{1-c}(R)} r_t.
+$$
+
+CVaR answers the question VaR refuses to: "given that we are in the tail,
+what is the average loss?" It is a **coherent risk measure** — it satisfies
+the four axioms of coherence (monotonicity, translation invariance,
+positive homogeneity, subadditivity), while VaR does not.
+
+**Ordering invariant:** $\text{CVaR}_c(R) \ge \text{VaR}_c(R)$ in magnitude
+(the average bad day is worse than the threshold day). This is enforced by
+`tests/test_risk_metrics.py::test_cvar_greater_than_var_in_magnitude`.
+
+**Small-tail edge case:** if fewer than 2 observations lie at or below the
+threshold (happens on very short return series at high confidence), CVaR is
+ill-defined. The implementation emits a `RuntimeWarning` and returns VaR.
+Tested by `test_cvar_small_tail_falls_back_to_var_with_warning`.
+
+### 12.4 Portfolio historical return series
+
+For a fixed weight vector $w \in \mathbb{R}^N$ and the daily return matrix
+$X \in \mathbb{R}^{T \times N}$, the **portfolio daily return series** is
+
+$$
+R_{p,t} = w^\top r_t = \sum_{i=1}^N w_i \, r_{t,i}, \quad t = 1, \ldots, T.
+$$
+
+**Assumptions (spec Section 3):**
+
+- Fixed weights $w$ (the optimal allocation from Phase 4).
+- Daily rebalancing to $w$ (implicit).
+- No transaction costs.
+- No rolling re-optimization.
+- This is a **static allocation analysis**, not a historical trading backtest.
+
+Every Phase 5 risk metric is computed on this series $R_{p,t}$, not on the
+annualized vector $\mu$ or the annualized covariance $\Sigma$. This preserves
+the statistical properties of the empirical return distribution — quantiles
+and drawdowns cannot be reconstructed from $\mu$ and $\Sigma$ alone.
+
+### 12.5 Efficient frontier as a family of target-return optima
+
+Phase 4 §11.5 defined the target-return optimizer
+
+$$
+w^*(\bar\mu) = \arg\min_{w \in \mathcal{F}} \; w^\top \Sigma w
+\quad \text{s.t.} \quad w^\top \mu = \bar\mu,\; \mathbf{1}^\top w = 1,\; 0 \le w_i \le 1.
+$$
+
+As $\bar\mu$ sweeps across the interval $[\mu_{\text{min-var}}, \mu_{\max}]$,
+the resulting portfolios trace the **efficient frontier** — the upper half
+of the min-variance envelope in $(\sigma, \mu)$ space. The lower half
+$\bar\mu \in [\mu_{\min}, \mu_{\text{min-var}})$ is inefficient: for any
+point on the lower branch, there exists a portfolio on the upper branch with
+the same volatility and strictly higher return, i.e., it is **dominated**.
+
+**Convexity:** For each $\bar\mu$, the objective $w^\top \Sigma w$ is a
+convex quadratic in $w$ and the constraints are linear. Hence the map
+$\bar\mu \mapsto \sigma^*(\bar\mu) = \sqrt{w^*(\bar\mu)^\top \Sigma w^*(\bar\mu)}$
+is convex in $\bar\mu$. This is why the frontier has the classic
+"bullet-shaped" appearance in $(\sigma, \mu)$ space, and why the Phase 5
+plot draws the efficient branch solid and the inefficient branch dashed
+— they are geometrically distinct halves of the same convex curve.
+
+**Frontier generation (Task 5.4):** `efficient_frontier(mu, Sigma, n_points)`
+sweeps `n_points` targets on each branch:
+
+$$
+\bar\mu^{(k)}_{\text{eff}} = \mu_{\text{min-var}} + \frac{k}{n_{\text{points}}-1} \left(\mu_{\max} - \mu_{\text{min-var}}\right), \quad k = 0, \ldots, n_{\text{points}}-1,
+$$
+
+and analogously for the inefficient branch over $[\mu_{\min}, \mu_{\text{min-var}}]$.
+
+### 12.6 Risk-return comparison across strategies
+
+Task 5.7's `compare_risk_metrics(mu, Sigma, returns, r_f, ...)` produces a
+tidy table with one row per strategy:
+
+| Column | Definition | Sign | Unit |
+| :--- | :--- | :--- | :--- |
+| `return` | $w^\top \mu$ | signed | decimal, annualized |
+| `volatility` | $\sqrt{w^\top \Sigma w}$ | non-negative | decimal, annualized |
+| `sharpe` | $(w^\top \mu - r_f) / \sqrt{w^\top \Sigma w}$ | signed | dimensionless |
+| `var_95` | $-\mathbb{Q}_{0.05}(R_{p,:})$ | signed (usually positive) | decimal, daily |
+| `cvar_95` | $-\mathbb{E}[R_{p,:} \mid R_{p,:} \le \mathbb{Q}_{0.05}]$ | signed (usually positive) | decimal, daily |
+| `max_drawdown` | $\min_t D_t(R_{p,:})$ | **signed, $\le 0$** | decimal, peak-to-trough |
+| `success` | optimizer flag | bool | — |
+
+The asymmetry between VaR (positive loss) and MDD (negative cumulative
+return) is intentional and follows the industry convention documented in
+`docs/risk_analysis_specification.md` Section 2.4.
+
+**Interpreting the table:** in a well-posed problem, the following should
+hold empirically:
+
+- `MinVolatility.volatility ≤ EqualWeight.volatility ≤ MaxSharpe.volatility`
+  (by construction — minimum variance is the global min under the long-only
+  constraint, and max-Sharpe typically concentrates on higher-variance,
+  higher-return assets)
+- `MaxSharpe.sharpe ≥ EqualWeight.sharpe` (by construction, unless the
+  optimizer found a local optimum — see §11.4)
+- `Var/MinVol` is usually the smallest VaR, but not guaranteed. VaR depends
+  on the tail shape; a portfolio can have low variance and a fat left tail
+  (e.g., concentrated in a single low-volatility asset that had one very
+  bad day).
+
+If a downstream check fails on any of these, investigate the optimizer (see
+§8 determinism note) before assuming a bug.
+
+### 12.7 Implementation Map (Phase 5)
+
+| Formula | Module | Function | Prohibited Call |
+| :--- | :--- | :--- | :--- |
+| $C_t = \prod (1+r_s)$ | `risk/metrics.py` | `drawdown_series` | manual cumprod + cummax (must route) |
+| $\text{MDD} = \min_t D_t$ | `risk/metrics.py` | `maximum_drawdown` | — |
+| $\text{VaR}_c = -Q_{1-c}(R)$ | `risk/metrics.py` | `historical_var` | `np.percentile` with non-linear methods |
+| $\text{CVaR}_c = -\mathbb{E}[R \mid R \le Q_{1-c}]$ | `risk/metrics.py` | `historical_cvar` | — |
+| $R_{p,t} = w^\top r_t$ | `risk/metrics.py` | `portfolio_historical_returns` | inline `w @ returns` at call sites |
+| Frontier $w^*(\bar\mu)$ sweep | `risk/frontier.py` | `efficient_frontier` | direct `scipy.optimize` calls |
+| Anchor + frontier bundle | `risk/frontier.py` | `analyze_frontier` | manual plot-data assembly |
+| Risk table across strategies | `risk/comparison.py` | `compare_risk_metrics` | manual aggregation |
+| Frontier plot | `visualization/charts.py` | `plot_efficient_frontier` | `matplotlib`, `seaborn` |
+| Drawdown plot | `visualization/charts.py` | `plot_drawdown` | — |
+| VaR histogram | `visualization/charts.py` | `plot_var_histogram` | — |
+
+Tests in `tests/test_risk_metrics.py` (23), `tests/test_frontier.py` (20),
+`tests/test_risk_comparison.py` (12), and `tests/test_visualization.py` (19)
+lock the identities and visualization contracts.
+
+### 12.8 References for Grader (Phase 5)
+
+- Task 5.1: Verified Phase 4 baseline — 160 tests, `mu == returns.mean()*252` bit-identical, `sigma == √diag(Σ_annual)` to `1.11e-16`
+- Task 5.2: Risk analysis specification — `docs/risk_analysis_specification.md`, eight decisions Q1–Q8 including the MDD-signed / VaR-positive asymmetry
+- Task 5.3: `src/risk/metrics.py` — `drawdown_series`, `maximum_drawdown`, `historical_var`, `historical_cvar`, `portfolio_historical_returns`; 23 offline tests
+- Task 5.4: `src/risk/frontier.py` — `efficient_frontier`; 50 points per branch; anchor via min-variance; metadata dict with five boundary keys; 15 offline tests
+- Task 5.5: `analyze_frontier` — assembles `efficient_df`, `inefficient_df`, `min_var`, `max_sharpe`, `equal_weight`, `assets`; 5 additional tests; design-invariant check that `analyze_frontier` reproduces `efficient_frontier`
+- Task 5.6: Three Plotly chart functions in `src/visualization/charts.py`; 19 offline tests; three PNGs generated by `python -m src.visualization.charts`
+- Task 5.7: `compare_risk_metrics` — risk-metric sibling of `compare_portfolios`; fixed row order (EqualWeight, MinVolatility, MaxSharpe, [TargetReturn]); `var_95`, `cvar_95`, `max_drawdown` columns; 12 offline tests; real-data check matches Group A to `1e-6`
+- Task 5.8: CLI (`python -m src.risk.comparison`) writes `docs/risk_analysis.md`; this §12 documents the underlying mathematics; README updated with Phase 5 section + screenshots
+
+Total Phase 5 test count: **74 new tests** (23 + 20 + 12 + 19), bringing the
+project-wide suite to **234**. No regressions to Phases 1–4.

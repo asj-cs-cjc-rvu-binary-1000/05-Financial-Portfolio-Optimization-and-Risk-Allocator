@@ -59,11 +59,14 @@ Reference structure from Section 3 of project brief:
 │   │   ├── optimizer.py          # Phase 4: min-var, max-Sharpe, target-return
 │   │   └── optimization_pipeline.py  # Phase 4: compare_portfolios + CLI
 │   ├── risk/
-│   │   └── __init__.py           # Phase 5: VaR, CVaR, drawdown
+│   │   ├── __init__.py           # Phase 5: package exports
+│   │   ├── metrics.py            # Phase 5: drawdown, VaR, CVaR
+│   │   ├── frontier.py           # Phase 5: efficient frontier
+│   │   └── comparison.py         # Phase 5: compare_risk_metrics + CLI        # Phase 5: VaR, CVaR, drawdown
 │   └── visualization/
 │       └── charts.py             # Phase 3+: Plotly charts
 ├── app/                          # Streamlit app (Phase 6)
-├── tests/                        # pytest suite (160 tests as of Phase 4)
+├── tests/                        # pytest suite (234 tests as of Phase 5)
 │   └── __init__.py
 ├── docs/
 │   ├── mathematical_foundations.md   # Phases 3 & 4 LaTeX derivations
@@ -190,6 +193,12 @@ pytest tests/test_returns.py -v   # 10 passed
 | :---: | :---: |
 | [Correlation](docs/screenshots/corr_heatmap.png) | [Eigen Spectrum](docs/screenshots/eigen_spectrum.png) |
 
+### Phase 5 visuals
+
+| Efficient Frontier | Drawdown (Max Sharpe) | VaR Histogram (Max Sharpe) |
+| :---: | :---: | :---: |
+| [Efficient Frontier](docs/screenshots/efficient_frontier.png) | [Drawdown](docs/screenshots/drawdown_max_sharpe.png) | [VaR Histogram](docs/screenshots/var_histogram_max_sharpe.png) |
+
 **How to run Phase 3:**
 
 ```bash
@@ -257,10 +266,69 @@ pytest tests/ -v                             # 160 passed (all phases)
 
 **Note on `RuntimeWarning`:** running `python -m src.optimization.optimization_pipeline` may print a `RuntimeWarning` about a module appearing in `sys.modules` before execution. This is expected Python behavior when a package `__init__.py` imports a module that is also run via `-m`. It is harmless and the CLI runs correctly.
 
-### Phase 5+ — Pending
+### Phase 5 – Risk Analysis & Efficient Frontier (Complete)
 
-- Phase 5: Risk metrics (VaR, CVaR, drawdown) + efficient frontier plot
-- Phase 6: Interactive Streamlit dashboard (`app/`)
+**Why this matters:** Phase 4 gave us the *optimizers*. Phase 5 gives us the *diagnostics* — how bad can a bad day be (VaR), how bad is a bad day on average (CVaR), how deep was the worst peak-to-trough drawdown (MDD), and what does the whole risk-return landscape look like (the efficient frontier). Full derivations in `docs/mathematical_foundations.md` §12.
+
+**Key functions** (in `src/risk/`):
+- `metrics.py` — `drawdown_series`, `maximum_drawdown` (signed ≤ 0), `historical_var` (positive loss magnitude), `historical_cvar`, `portfolio_historical_returns` (fixed weights, daily rebalancing)
+- `frontier.py` — `efficient_frontier(mu, Sigma, n_points=50)` returns `(efficient_df, inefficient_df, metadata)`; `analyze_frontier(...)` bundles the two branches with the min-var / max-Sharpe / equal-weight anchor portfolios and per-asset scatter data
+- `comparison.py` — `compare_risk_metrics(mu, Sigma, returns, r_f, ...)` adds `var_95`, `cvar_95`, `max_drawdown` to the Phase 4 comparison table
+
+**Visualizations** (in `src/visualization/charts.py`, Plotly-only):
+- `plot_efficient_frontier(analysis)` — six-layer figure: inefficient dashed grey, efficient solid blue, per-asset scatter, labeled Min Volatility / Max Sharpe / Equal Weight points
+- `plot_drawdown(drawdown_series, portfolio_name)` — filled area chart, MDD annotated
+- `plot_var_histogram(returns, var_value, portfolio_name, confidence_level=0.95)` — two-trace histogram (body / tail) with the VaR threshold line
+
+**One-command risk comparison (on the latest processed CSV):**
+
+```bash
+source .venv/bin/activate
+python -m src.risk.comparison
+```
+
+Example output on real 7-ticker data (r_f = 2%/yr, c = 95%):
+
+```text
+               return  volatility  sharpe  var_95  cvar_95  max_drawdown  success    AAPL    MSFT     JPM     JNJ      PG     XOM    AMZN
+EqualWeight    0.1988      0.1843  0.9701  0.0166   0.0277       -0.3019     True  0.1429  0.1429  0.1429  0.1429  0.1429  0.1429  0.1429
+MinVolatility  0.1479      0.1587  0.8054  0.0139   0.0231       -0.2748     True  0.0000  0.0395  0.0284  0.3520  0.3383  0.1364  0.1055
+MaxSharpe      0.2236      0.2018  1.0088  0.0184   0.0299       -0.3142     True  0.3378  0.2242  0.0825  0.2075  0.0296  0.1055  0.0130
+```
+
+Reading the table:
+
+- VaR / CVaR are positive loss magnitudes (industry convention). 1.66% VaR for EqualWeight means "on 95% of days the portfolio's loss does not exceed 1.66%."
+
+- MDD is a signed peak-to-trough cumulative return, always ≤ 0. -30.19% for EqualWeight means "the portfolio's worst peak-to-trough decline over 2018–2026 was 30.19%."
+
+- MinVolatility has the lowest VaR (1.39%), lowest CVaR (2.31%), and shallowest drawdown (-27.48%) — exactly what a defensive portfolio should produce. It also has the lowest Sharpe (0.81) because it sacrifices return for safety.
+
+- MaxSharpe has the highest Sharpe (1.0088) but the worst tail risk (VaR 1.84%, CVaR 2.99%, MDD -31.42%) — the classic return-for-risk trade-off in the tail.
+
+- Full interpretation is auto-written to docs/risk_analysis.md on each run.
+
+Regenerate all five PNGs (Phase 3 + Phase 5):
+
+```bash
+python -m src.visualization.charts
+Offline tests:
+```
+
+```bash
+pytest tests/test_risk_metrics.py -v          # 23 passed
+pytest tests/test_frontier.py -v              # 20 passed
+pytest tests/test_risk_comparison.py -v       # 12 passed
+pytest tests/test_visualization.py -v         # 19 passed
+pytest tests/ -v                              # 234 passed (all phases)
+```
+
+Note on kaleido DeprecationWarning: python -m src.visualization.charts prints a DeprecationWarning about kaleido < 1.0.0. This is expected: kaleido==0.2.1 is pinned because kaleido >= 1.0 requires system Chrome, which fails in the Codespace sandbox. The pinned version works headless and renders all five PNGs correctly. Do not upgrade kaleido — see docs/environment_versions.md for the Phase 3 rationale.
+
+### Phase 6+ — Pending
+
+- Phase 6: Interactive Streamlit dashboard (app/)
+
 - Phase 7: Documentation finalization, screenshots, final testing, presentation
 
 ## Team Members and Course Context
@@ -272,7 +340,7 @@ pytest tests/ -v                             # 160 passed (all phases)
   - Phase 2: Preprocessing & Returns — ✅ Complete
   - Phase 3: Linear Algebra (Covariance, Correlation, Eigen) — ✅ Complete
   - Phase 4: Optimization (Mean-Variance, Max-Sharpe, Target-Return) — ✅ Complete
-  - Phase 5: Risk Metrics (VaR, CVaR, Drawdown) & Efficient Frontier — ⏳ Pending
+  - Phase 5: Risk Analysis (VaR, CVaR, Drawdown) & Efficient Frontier — ✅ Complete
   - Phase 6: Interactive Streamlit Dashboard — ⏳ Pending
   - Phase 7: Documentation, Testing & Final Polish — ⏳ Pending
 
