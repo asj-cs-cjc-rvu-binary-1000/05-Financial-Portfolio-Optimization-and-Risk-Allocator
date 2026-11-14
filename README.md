@@ -61,22 +61,33 @@ Reference structure from Section 3 of project brief:
 │   ├── risk/
 │   │   ├── __init__.py           # Phase 5: package exports
 │   │   ├── metrics.py            # Phase 5: drawdown, VaR, CVaR
-│   │   ├── frontier.py           # Phase 5: efficient frontier
-│   │   └── comparison.py         # Phase 5: compare_risk_metrics + CLI        # Phase 5: VaR, CVaR, drawdown
+│   │   ├── frontier.py           # Phase 5: efficient frontier, analyze_frontier
+│   │   └── comparison.py         # Phase 5: compare_risk_metrics + CLI
 │   └── visualization/
 │       └── charts.py             # Phase 3+: Plotly charts
 ├── app/                          # Streamlit app (Phase 6)
 │   ├── __init__.py
 │   └── app.py                    # entry point — `streamlit run app/app.py`
-├── tests/                        # pytest suite (254 tests as of Phase 6)
+├── tests/                        # pytest suite (252 tests as of Phase 6)
 │   └── __init__.py
 ├── docs/
 │   ├── mathematical_foundations.md   # Phases 3 & 4 LaTeX derivations
 │   ├── optimization_specification.md # Phase 4 decisions Q1–Q7
+│   ├── risk_analysis_specification.md # Phase 5 decisions Q1–Q8
+│   ├── dashboard_specification.md    # Phase 6 decisions Q1–Q8
 │   ├── optimization_summary.md       # Phase 4 live comparison table
+│   ├── risk_analysis.md              # Phase 5 live risk table
 │   ├── eigen_analysis.md             # Phase 3 live eigen report
 │   ├── return_summary.md             # Phase 2 live return report
 │   ├── data_summary.md               # Phase 1 live data report
+│   ├── environment_versions.md       # Dependency snapshot + pin rationale
+│   ├── team_plan.md                  # Original team ownership plan
+│   ├── phase5_inputs_verification.md # Phase 5 baseline
+│   ├── phase6_inputs_verification.md # Phase 6 baseline
+│   ├── phase7_repository_audit.md    # Phase 7 final audit
+│   ├── phase7_test_report.md         # Phase 7 test report
+│   ├── phase7_end_to_end_verification.md # Phase 7 E2E report
+│   ├── reproducibility_guide.md      # Phase 7 fresh-clone guide
 │   └── screenshots/                  # PNGs for final README
 ├── pytest.ini                    # Pin sys.path=repo root for tests
 ├── requirements.txt
@@ -363,8 +374,20 @@ Open the forwarded URL in the Codespace Ports tab.
 
 **Screenshots:** docs/screenshots/dashboard_optimization.png, dashboard_risk.png, dashboard_frontier.png — captured from the running app on the real 7-ticker dataset at r_f = 2%.
 
-### Phase 7 — Pending
-Documentation finalization, final screenshots, final testing, presentation
+### Phase 7 – Testing, Documentation & Final Delivery (Complete)
+
+- Full test suite: **252 passing**
+- Final repository audit: `docs/phase7_repository_audit.md`
+- Test report: `docs/phase7_test_report.md`
+- End-to-end verification: `docs/phase7_end_to_end_verification.md`
+- Reproducibility guide: `docs/reproducibility_guide.md`
+- Academic reports: `docs/academic_report_rvu.md`, `docs/academic_report_ieee.md`
+- Presentation outline: `docs/presentation_outline.md`
+- Release notes: `docs/release_notes.md`
+
+### Final Status: 100% Complete
+
+All 7 phases are complete. The project is ready for submission and demonstration.
 
 ## Team Members and Course Context
 
@@ -377,7 +400,7 @@ Documentation finalization, final screenshots, final testing, presentation
   - Phase 4: Optimization (Mean-Variance, Max-Sharpe, Target-Return) — ✅ Complete
   - Phase 5: Risk Analysis (VaR, CVaR, Drawdown) & Efficient Frontier — ✅ Complete
   - Phase 6: Interactive Streamlit Dashboard — ✅ Complete
-  - Phase 7: Documentation, Testing & Final Polish — ⏳ Pending
+  - Phase 7: Documentation, Testing & Final Polish — ✅ Complete
 
 ## License
 

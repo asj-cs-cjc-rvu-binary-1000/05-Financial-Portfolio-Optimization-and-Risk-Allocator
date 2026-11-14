@@ -134,3 +134,17 @@ Variance adds linearly under independence: Var(annual) ≈ 252 * Var(daily). Std
 - Contract verified: np.isclose(sigma_annual, sqrt(var(ddof=1)*252)) and later sqrt(diag(Sigma_annual)) == sigma_annual elementwise.
 
 **Verification:** returns.std(ddof=1)*sqrt(252) exact match.
+
+---
+
+## Phase 7 Status Update (2026-11-14)
+
+All phases (0–6) are complete. The `src/` ownership plan documented above was
+honored throughout: the `src/data/` and `src/preprocessing/` owners led
+Phases 1–2; the `src/linear_algebra/` and `src/optimization/` owners led
+Phases 3–4; both members contributed to Phases 5–6 as the risk and
+dashboard layers crossed module boundaries.
+
+This file is preserved as a historical record of the original plan. The
+authoritative project structure is documented in `README.md`. The final test
+baseline is 252 passing tests documented in `docs/phase7_test_report.md`.
