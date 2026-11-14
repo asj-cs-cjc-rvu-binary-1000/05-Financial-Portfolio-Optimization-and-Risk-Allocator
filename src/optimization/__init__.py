@@ -24,10 +24,20 @@ from src.optimization.portfolio_metrics import (
     portfolio_volatility,
     portfolio_sharpe,
 )
+from src.optimization.constraints import (
+    validate_weights,
+    budget_constraint,
+    long_only_bounds,
+    target_return_constraint,
+)
 
 __all__ = [
     "portfolio_return",
     "portfolio_variance",
     "portfolio_volatility",
     "portfolio_sharpe",
+    "validate_weights",
+    "budget_constraint",
+    "long_only_bounds",
+    "target_return_constraint",
 ]
