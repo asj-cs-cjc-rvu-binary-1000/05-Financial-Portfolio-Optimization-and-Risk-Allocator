@@ -41,3 +41,5 @@ data/processed/*.CSV
 build/
 dist/
 *.egg-info/
+# Academic report assets (not project outputs)
+docs/screenshots/rvu-logo.png
