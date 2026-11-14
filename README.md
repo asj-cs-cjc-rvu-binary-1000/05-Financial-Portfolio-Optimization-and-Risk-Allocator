@@ -347,4 +347,4 @@ Copyright (c) 2026 Financial Portfolio Optimization and Risk Allocator Team. Aca
 
 
 ---
-*Setup verified on Python 3.14.2 | numpy 2.5.4 | pandas 3.1.0 | scipy 1.18.1 | yfinance 1.4.1 | plotly 7.1.0 | streamlit 1.66.1 | pytest 9.2.0*
+*Setup verified on Python 3.14.2 | numpy 2.5.4 | pandas 3.1.0 | scipy 1.18.1 | yfinance 1.4.1 | plotly 7.1.0 | streamlit 1.66.1 | pytest 9.2.0
